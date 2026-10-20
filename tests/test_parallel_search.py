@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
 from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
@@ -398,6 +398,46 @@ class ParallelAgentTests(unittest.IsolatedAsyncioTestCase):
             bot = LangChainBot("test", "saved", search_provider="none")
             self.assertEqual(await bot.ask("hello"), "Offline answer.")
         self.assertEqual(fixture.requests, [])
+
+    async def test_saved_serpapi_runs_through_agent_without_mcp(self):
+        fixture = MCPFixture()
+        search = SimpleNamespace(
+            run=Mock(),
+            arun=AsyncMock(
+                return_value="Saved provider source https://example.org/news: Monday."
+            ),
+        )
+        model = RecordingModel(
+            responses=[
+                call("Search", "release date"),
+                AIMessage(content="Monday from SerpAPI."),
+            ]
+        )
+        bot = get_bot(
+            Config(bot="langchain", openai_key="test", serpapi_api_key="saved-key")
+        )
+        with (
+            fixture.patch(),
+            patch("xiaogpt.langchain.chain.ChatOpenAI", return_value=model),
+            patch(
+                "xiaogpt.langchain.chain.SerpAPIWrapper", return_value=search
+            ) as wrapper,
+        ):
+            self.assertEqual(
+                await bot.ask("Find the release date"), "Monday from SerpAPI."
+            )
+        wrapper.assert_called_once_with(serpapi_api_key="saved-key")
+        search.arun.assert_awaited_once_with("release date")
+        search.run.assert_not_called()
+        self.assertEqual(fixture.requests, [])
+        self.assertTrue(
+            any(
+                isinstance(m, FunctionMessage)
+                and "Saved provider source https://example.org/news" in m.content
+                for messages in model.seen
+                for m in messages
+            )
+        )
 
     def test_saved_config_and_command_line_override(self):
         with tempfile.TemporaryDirectory() as folder:
