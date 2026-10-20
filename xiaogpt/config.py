@@ -62,6 +62,7 @@ class Config:
     gemini_model: str = os.getenv("GEMINI_MODEL", "")  # keep the old rule
     qwen_key: str = os.getenv("DASHSCOPE_API_KEY", "")  # keep the old rule
     serpapi_api_key: str = os.getenv("SERPAPI_API_KEY", "")
+    langchain_search_provider: Literal["auto", "parallel", "serpapi", "none"] = "auto"
     gemini_api_domain: str = os.getenv(
         "GEMINI_API_DOMAIN", ""
     )  # 自行部署的 Google Gemini 代理
@@ -92,6 +93,13 @@ class Config:
     gpt_options: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        if self.langchain_search_provider not in (
+            "auto",
+            "parallel",
+            "serpapi",
+            "none",
+        ):
+            raise ValueError("Invalid langchain_search_provider")
         if self.proxy:
             validate_proxy(self.proxy)
         if (

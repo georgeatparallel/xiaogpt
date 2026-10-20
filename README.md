@@ -92,7 +92,7 @@ xiaogpt --hardware LX06  --mute_xiaoai --use_moonshot_api --moonshot_api_key ${m
 xiaogpt --hardware LX06  --mute_xiaoai --use_llama --llama_api_key ${llama_api_key}
 # 如果你想使用 01
 xiaogpt --hardware LX06  --mute_xiaoai --use_yi_api --ti_api_key ${yi_api_key}
-# 如果你想使用 LangChain+SerpApi 实现上网检索或其他本地服务（目前仅支持 stream 模式）
+# 如果你想保留 LangChain+SerpApi 实现上网检索或其他本地服务
 export OPENAI_API_KEY=${your_api_key}
 export SERPAPI_API_KEY=${your_serpapi_key}
 xiaogpt --hardware Lx06 --use_langchain --mute_xiaoai --stream --openai_key ${your_api_key} --serpapi_api_key ${your_serpapi_key}
@@ -127,11 +127,38 @@ xiaogpt --hardware LX06  --mute_xiaoai --use_yi_api --ti_api_key ${yi_api_key}
 python3 xiaogpt.py --hardware LX06  --mute_xiaoai --use_doubao --stream --volc_access_key xxxx --volc_secret_key xxx
 # 如果你想使用 llama3
 python3 xiaogpt.py --hardware LX06  --mute_xiaoai --use_llama --llama_api_key ${llama_api_key}
-# 如果你想使用 LangChain+SerpApi 实现上网检索或其他本地服务（目前仅支持 stream 模式）
+# 如果你想保留 LangChain+SerpApi 实现上网检索或其他本地服务
 export OPENAI_API_KEY=${your_api_key}
 export SERPAPI_API_KEY=${your_serpapi_key}
 python3 xiaogpt.py --hardware Lx06 --use_langchain --mute_xiaoai --stream --openai_key ${your_api_key} --serpapi_api_key ${your_serpapi_key}
 ```
+
+### LangChain 联网搜索
+
+`--use_langchain` 在未配置 SerpAPI key 时，默认通过
+[Parallel Search MCP](https://docs.parallel.ai/integrations/mcp/search-mcp)
+提供免费匿名联网搜索（Fast 模式）和网页读取，无需搜索服务账号或 API key。
+仍需配置 OpenAI key，并允许访问 `https://search.parallel.ai/mcp`。
+服务有使用限额，失败或超时会返回工具错误，不会自动切换搜索服务。
+
+```shell
+xiaogpt --hardware LX06 --use_langchain --openai_key YOUR_OPENAI_KEY
+# 即使配置了 SerpAPI key，也可以显式选择 Parallel
+xiaogpt --hardware LX06 --use_langchain --langchain_search_provider parallel
+```
+
+可在 YAML/JSON 中设置 `langchain_search_provider`，或通过同名命令行参数覆盖：
+
+| 值 | 行为 |
+| --- | --- |
+| `auto`（默认） | 配置了 `serpapi_api_key` / `SERPAPI_API_KEY` 时保留 SerpAPI，否则使用 Parallel |
+| `parallel` | 使用 Parallel 的 Search 和 Fetch 工具 |
+| `serpapi` | 使用原有 SerpAPI Search 工具，需要 SerpAPI key |
+| `none` | 禁用联网工具，仍可使用 Calculator |
+
+只有 LangChain bot 使用这些设置。搜索和网页内容会传给模型作为工具结果。
+同一 bot 的后续提问沿用会话标识；更改提示词（清空历史）或新建 bot 会生成新标识。
+语音“结束持续对话”保留原有历史，因此不会重置标识。
 
 ## config.yaml
 

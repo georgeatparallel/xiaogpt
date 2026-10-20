@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import os
+from contextlib import suppress
+from uuid import uuid4
 
 from langchain_classic.memory import ConversationBufferWindowMemory
 from rich import print
@@ -21,6 +23,7 @@ class LangChainBot(BaseBot):
         serpapi_api_key: str,
         proxy: str | None = None,
         api_base: str | None = None,
+        search_provider: str = "auto",
     ) -> None:
         # Set environment indicators
         os.environ["OPENAI_API_KEY"] = openai_key
@@ -30,12 +33,17 @@ class LangChainBot(BaseBot):
         if proxy:
             os.environ["OPENAI_PROXY"] = proxy
         self.memory = ConversationBufferWindowMemory(return_messages=True)
+        self.search_provider = search_provider
+        self.serpapi_api_key = serpapi_api_key
+        self.proxy = proxy
+        self.search_session_id = str(uuid4())
 
     def has_history(self) -> bool:
         return len(self.memory.chat_memory.messages) > 0
 
     def change_prompt(self, new_prompt: str) -> None:
         self.memory.clear()
+        self.search_session_id = str(uuid4())
         self.memory.chat_memory.add_user_message(new_prompt)
 
     @classmethod
@@ -45,19 +53,36 @@ class LangChainBot(BaseBot):
             serpapi_api_key=config.serpapi_api_key,
             proxy=config.proxy,
             api_base=config.api_base,
+            search_provider=config.langchain_search_provider,
         )
 
     async def ask(self, query, **options):
-        return await agent_search(query, self.memory)
+        return await agent_search(query, self.memory, **self._search_options())
+
+    def _search_options(self):
+        return {
+            "search_provider": self.search_provider,
+            "serpapi_api_key": self.serpapi_api_key,
+            "session_id": self.search_session_id,
+            "proxy": self.proxy,
+        }
 
     async def ask_stream(self, query, **options):
         callback = AsyncIteratorCallbackHandler()
-        task = asyncio.create_task(agent_search(query, self.memory, callback))
+        task = asyncio.create_task(
+            agent_search(query, self.memory, callback, **self._search_options())
+        )
         try:
             async for message in split_sentences(callback.aiter()):
                 yield message
+        except (asyncio.CancelledError, GeneratorExit):
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+            raise
         except Exception as e:
             print("An error occurred:", str(e))
         finally:
             print()
-            await task
+            if not task.cancelled():
+                await task

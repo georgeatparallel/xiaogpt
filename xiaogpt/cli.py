@@ -78,6 +78,11 @@ def main():
         help="serp api key see https://serpapi.com/",
     )
     parser.add_argument(
+        "--langchain_search_provider",
+        choices=["auto", "parallel", "serpapi", "none"],
+        help="LangChain web tools: auto uses configured SerpAPI, otherwise Parallel",
+    )
+    parser.add_argument(
         "--proxy",
         dest="proxy",
         help="http proxy url like http://localhost:8080",

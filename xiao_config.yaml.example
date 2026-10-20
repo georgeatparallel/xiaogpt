@@ -41,6 +41,10 @@ stream: true
 #   model: gpt-4o-mini
 gpt_options: {}
 
+# LangChain 搜索：auto 有 SerpAPI key 时使用 SerpAPI，否则使用免费匿名 Parallel MCP。
+# parallel 强制使用 Parallel；serpapi 强制使用 SerpAPI（需要 key）；none 禁用联网工具。
+langchain_search_provider: auto
+
 # ----- OpenAI -----
 # OpenAI key
 openai_key: ""
